@@ -1,4 +1,4 @@
-# TEGAN
+# Introduction
 This repository provides source code for replication of TEGAN
 
 # Running Environment
