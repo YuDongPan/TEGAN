@@ -1,6 +1,7 @@
 # 设计师:Pan YuDong
 # 编写者:God's hand
 # 时间:2022/9/8 19:46
+import math
 import torch
 import argparse
 import Utils.EEGDataset as EEGDataset
@@ -54,7 +55,7 @@ for subject in range(1, opt.Ns + 1):
         source_dataset = EEGDataset.getSSVEP12Inter(subject, mode="train")
 
     EEGData_Source, EEGLabel_Source = source_dataset[:]
-    EEGData_Source = EEGData_Source[:, :, :, :round(opt.factor * opt.ws * opt.Fs)]
+    EEGData_Source = EEGData_Source[:, :, :, :math.ceil(opt.ws * opt.Fs) * opt.factor]
 
     print(f"EEGData_Source.shape:{EEGData_Source.shape}")
     print(f"EEGLabel_Source.shape:{EEGLabel_Source.shape}")
@@ -93,8 +94,8 @@ for subject in range(1, opt.Ns + 1):
         target_dataloader = torch.utils.data.DataLoader(dataset=EEGData_Target, batch_size=opt.bz, shuffle=True)
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        Dt = TEGAN.Discriminator(opt.Nc, round(opt.ws * opt.Fs), opt.Nf, opt.ws, opt.factor, pretrain=True)
-        Gt = TEGAN.Generator(opt.Nc, round(opt.ws * opt.Fs), opt.Nf, opt.ws, opt.factor)
+        Dt = TEGAN.Discriminator(opt.Nc, math.ceil(opt.ws * opt.Fs), opt.Nf, opt.ws, opt.factor, pretrain=True)
+        Gt = TEGAN.Generator(opt.Nc, math.ceil(opt.ws * opt.Fs), opt.Nf, opt.ws, opt.factor)
         Gt.load_state_dict(
             torch.load(f'../Pretrain/{opt.dataset}/{opt.ws}S-{opt.ws * opt.factor}S/Source/TEGAN_Gs_S{subject}.pth'))
         Dt.load_state_dict(
@@ -103,7 +104,7 @@ for subject in range(1, opt.Ns + 1):
         Gt = Gt.to(device)
 
         opt.lr = 0.01
-        opt.bz = 24 if opt.dataset == 'Direction' else 30
+        opt.bz = 20 if opt.dataset == 'Direction' else 24
         GAN_Trainer.train_on_batch(opt, 500, target_dataloader, Gt, Dt, device, subject=subject, source=1,
                                    lr_jitter=True)
 

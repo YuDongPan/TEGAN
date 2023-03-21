@@ -5,12 +5,20 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-dataset = 'Dial'
-method = 'MSI'
-ratio = -1
-UD = -1
 win_size = 1.0
+dataset = 'Direction'
+method = 'TRCA'
+control_group = f'{dataset}/{method}'
+variable_group = f'{dataset}_AUG/{method}'
+ratio = 3
+UD = 0
+metric = 0
 
+
+if metric == 0:
+    ttest_column = 'Mean±Std'
+else:
+    ttest_column = 'ITR(bits/min)'
 
 if ratio == -1:
     proportion = 'Training-Free'
@@ -31,14 +39,14 @@ else:
     val_way = 'CrossSubject'
 
 
-org_csv_file = f'./{dataset}/{method}/{proportion}_{val_way}_Classification_Result({str(win_size)}S).csv'
-aug_csv_file = f'./{dataset}_AUG/{method}/{proportion}_{val_way}_Classification_Result({str(win_size)}S).csv'
+org_csv_file = f'./{control_group}/{proportion}_{val_way}_Classification_Result({str(win_size)}S).csv'
+aug_csv_file = f'./{variable_group}/{proportion}_{val_way}_Classification_Result({str(win_size)}S).csv'
 
 org_df = pd.read_csv(org_csv_file)
 aug_df = pd.read_csv(aug_csv_file)
 
-result_org = org_df['Mean±Std'].tolist()
-result_aug = aug_df['Mean±Std'].tolist()
+result_org = org_df[ttest_column].tolist()
+result_aug = aug_df[ttest_column].tolist()
 
 result_org = [float(result_org[i].split('±')[0]) for i in range(len(result_org) - 1)]
 result_aug = [float(result_aug[i].split('±')[0]) for i in range(len(result_aug) - 1)]

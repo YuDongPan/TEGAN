@@ -10,6 +10,7 @@
     4.**Remarkable progress in 12-class dataset(1s-2S)**
 '''
 import torch
+import math
 import torch.nn.functional as F
 from torch import nn
 from Utils import Constraint
@@ -78,14 +79,13 @@ class Discriminator(nn.Module):
     def __init__(self, Nc, Nt, Nf, ws, factor, pretrain=False):
         super(Discriminator, self).__init__()
         self.Nc = Nc
-        self.Nt = round(Nt * factor)
+        self.Nt = Nt * factor
         self.Nf = Nf
         self.dropout_level = 0.5
         self.factor = factor
         self.ws = ws
         self.K = 10
         self.S = 2
-
         self.space = self.spatial_block(1, 2 * self.Nc, self.dropout_level, kernel_size=self.Nc, stride=self.Nc)
 
         # (batch_size, 2 * Nc, 1, Nt)
@@ -212,7 +212,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.Nc = Nc
         self.Nt1 = Nt
-        self.Nt2 = round(Nt * factor)
+        self.Nt2 = Nt * factor
         self.Nf = Nf
         self.dropout_level = 0.5
         self.factor = factor
@@ -220,9 +220,8 @@ class Generator(nn.Module):
 
         '''Method1:Self-definition'''
         self.down_k = [20, 12, 8]
-        if self.ws == 0.5:
-            for i in range(len(self.down_k)):
-                self.down_k[i] //= 2
+        for i in range(len(self.down_k)):
+            self.down_k[i] = math.ceil(self.down_k[i] * self.ws)
 
         # '''Method2:Self-Adaptive'''
         # self.down_k = [0, 0, 0]
