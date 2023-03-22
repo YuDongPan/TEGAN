@@ -87,7 +87,7 @@ def plot_TimeEEG(subject, eeg_data, eeg_label, epoch, model_name, dataset, real_
     # for 4-class dataset
     if dataset == 'Direction':
         ax.set_yticklabels(['P7', 'P3', 'Pz', 'P4', 'P8', 'PO9', 'O1', 'OZ', 'O2', 'PO10'])
-    # for 40-class dataset
+    # for 12-class dataset
     else:
         ax.set_yticklabels(['PO7', 'PO3', 'POZ', 'PO4', 'PO8', 'O1', 'OZ', 'O2'])
 
