@@ -10,5 +10,5 @@ pip install -r Resource/requirements.txt
 ```
 
 # References
-[1] Pan, Yudong, Ning Li, and Yangsong Zhang. "Short-time SSVEP data extension by a novel generative adversarial networks based framework." arXiv preprint arXiv:2301.05599 (2023).
+[1] Pan, Yudong, Ning Li, and Yangsong Zhang, Peng Xu, Dezhong Yao. "Short-time SSVEP data extension by a novel generative adversarial networks based framework." arXiv preprint arXiv:2301.05599 (2023).
 
