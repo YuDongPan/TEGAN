@@ -3,46 +3,71 @@
 # 时间:2022/7/4 20:40
 import torch
 import time
+from etc.global_config import config
+def train_on_batch(num_epochs, train_iter, test_iter, optimizer, criterion, net, device, lr_jitter=False):
+    algorithm = config['algorithm']
+    if algorithm == "DDGCNN":
+        lr_decay_rate = config[algorithm]['lr_decay_rate']
+        optim_patience = config[algorithm]['optim_patience']
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=lr_decay_rate,
+                                                               patience=optim_patience, verbose=True, eps=1e-08)
+    else:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs * len(train_iter),
+                                                               eta_min=5e-6)
 
-def train_on_batch(num_epochs, train_iter, valid_iter, lr, criterion, net, device, wd=0, lr_jitter=False):
-    trainer = torch.optim.Adam(net.parameters(), lr=lr, betas=(0.9, 0.999), weight_decay=wd)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(trainer, T_max=num_epochs * len(train_iter), eta_min=5e-6)
     for epoch in range(num_epochs):
-        # training
+        # ==================================training procedure==========================================================
         net.train()
         sum_loss = 0.0
         sum_acc = 0.0
-        for (X, y) in train_iter:
-            X = X.type(torch.FloatTensor)
-            y = torch.as_tensor(y.reshape(y.shape[0]), dtype=torch.int64)
-            X = X.to(device)
-            y = y.to(device)
-            y_hat = net(X)
+        for data in train_iter:
+            if algorithm == "ConvCA":
+                X, temp, y = data
+                X = X.type(torch.FloatTensor).to(device)
+                temp = temp.type(torch.FloatTensor).to(device)
+                y = torch.as_tensor(y.reshape(y.shape[0]), dtype=torch.int64).to(device)
+                y_hat = net(X, temp)
+
+            else:
+                X, y = data
+                X = X.type(torch.FloatTensor).to(device)
+                y = torch.as_tensor(y.reshape(y.shape[0]), dtype=torch.int64).to(device)
+                y_hat = net(X)
+
             loss = criterion(y_hat, y).sum()
-            trainer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            trainer.step()
-            if lr_jitter:
+            optimizer.step()
+            if lr_jitter and algorithm != "DDGCNN":
                 scheduler.step()
             sum_loss += loss.item() / y.shape[0]
             sum_acc += (y == y_hat.argmax(dim=-1)).float().mean()
+
         train_loss = sum_loss / len(train_iter)
         train_acc = sum_acc / len(train_iter)
+        if lr_jitter and algorithm == "DDGCNN":
+            scheduler.step(train_acc)
 
-        # test
+        # ==================================testing procedure==========================================================
         if epoch == num_epochs - 1:
             net.eval()
             sum_acc = 0.0
-            for (X, y) in valid_iter:
-                X = X.type(torch.FloatTensor)
-                y = torch.as_tensor(y.reshape(y.shape[0]), dtype=torch.int64)
-                X = X.to(device)
-                y = y.to(device)
-                y_hat = net(X)
+            for data in test_iter:
+                if algorithm == "ConvCA":
+                    X, temp, y = data
+                    X = X.type(torch.FloatTensor).to(device)
+                    temp = temp.type(torch.FloatTensor).to(device)
+                    y = torch.as_tensor(y.reshape(y.shape[0]), dtype=torch.int64).to(device)
+                    y_hat = net(X, temp)
+
+                else:
+                    X, y = data
+                    X = X.type(torch.FloatTensor).to(device)
+                    y = torch.as_tensor(y.reshape(y.shape[0]), dtype=torch.int64).to(device)
+                    y_hat = net(X)
+
                 sum_acc += (y == y_hat.argmax(dim=-1)).float().mean()
-
-            val_acc = sum_acc / len(valid_iter)
-
+            val_acc = sum_acc / len(test_iter)
         print(f"epoch{epoch + 1}, train_loss={train_loss:.3f}, train_acc={train_acc:.3f}")
     print(
         f'training finished at {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} with final_valid_acc={val_acc:.3f}')

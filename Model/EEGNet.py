@@ -79,4 +79,5 @@ class EEGNet(nn.Module):
         # Third Layer:Fully Connected + Softmax
         X = X.reshape(-1, self.fc_in)
         out = self.fc(X)
+
         return out

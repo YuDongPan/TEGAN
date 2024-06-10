@@ -1,0 +1,107 @@
+algorithm: EEGNet
+
+# Parameters for training procedure
+train_param:
+  UD: 0                  # -1——Unsupervised, 0——User-Dependent；1——User-Independent
+  ratio: 3               # -1——Training-Free, 1——80% vs 20%;2——50% vs 50%;3——20% vs 80%(UD Approach)
+  # 0 or else——(N-1)/N vs 1/N(UI Approach)
+
+# Parameters for ssvep data
+data_param:
+  Ds: Direction               # Direction or Dial
+  ws: 0.5                     # window size of ssvep
+  Nh: 100                      # number of trial
+  Nc: 10                        # number of channel
+  Fs: 100                      # frequency of sample
+  Nf: 4                       # number of stimulus
+  Ns: 54                      # number of subjects
+
+# parameters for TEGAN
+TEGAN:
+  F: 2                        # expansion factor
+  f1_epochs: 200              # number of epochs for first training stage
+  f2_epochs: 500              # number of epochs for second training stage
+  f1_bz: 64                   # batch size for first training stage
+  f2_bz: 20                   # batch size for second training stage
+  f1_lr: 0.001                # learning rate for first training stage
+  f2_lr: 0.01                 # learning rate for second training stage
+  f1_wd: 0.001                # weight decay for first training stage
+  f2_wd: 0.003                # weight decay for second training stage
+  start: 50                   # when to start using LeCAM Divergence Regularization
+
+# Parameters for traditional methods
+FBCCA:
+  Nm: 3                                                 # number of filter banks
+  # passband: [4, 10, 16, 22, 28, 34, 40]               # for 4-class dataset
+  passband: [ 6, 14, 22, 30, 38, 46, 54, 62, 70, 78 ]     # for 12-class and 40-class dataset
+  # stopband: [2, 6, 10, 16, 22, 28, 34]                # for 4-class dataset
+  stopband: [ 4, 10, 16, 24, 32, 40, 48, 56, 64, 72 ]     # for 12-class and 40-class dataset
+  highcut_pass: 80                                       # 4-class: 40, 12-class: 80, 40-class: 90
+  highcut_stop: 90                                      # 4-class: 50, 12-class: 90, 40-class: 100
+
+
+TRCA:
+  Nm: 3                                                 # number of filter banks
+  # passband: [4, 10, 16, 22, 28, 34, 40]               # for 4-class dataset
+  passband: [ 6, 14, 22, 30, 38, 46, 54, 62, 70, 78 ]     # for 12-class and 40-class dataset
+  # stopband: [2, 6, 10, 16, 22, 28, 34]                # for 4-class dataset
+  stopband: [ 4, 10, 16, 24, 32, 40, 48, 56, 64, 72 ]     # for 12-class and 40-class dataset
+  highcut_pass: 80                                       # 4-class: 40, 12-class: 80, 40-class: 90
+  highcut_stop: 90                                      # 4-class: 50, 12-class: 90, 40-class: 100
+  is_ensemble: 1                                        # 1->ensemble TRCA, 0->TRCA
+
+
+# Parameters for DL-based methods
+EEGNet:
+  epochs: 200                  # number of epochs
+  bz: 20                     # batch size
+  lr: 0.001                       # learning rate
+  wd: 0.0001                   # weight decay
+  lr_jitter: false             # learning rate scheduler
+
+CCNN:
+  epochs: 500                  # number of epochs
+  bz: 16                     # batch size
+  lr: 0.001                       # learning rate
+  wd: 0.0001                   # weight decay
+  lr_jitter: false             # learning rate scheduler
+
+FBtCNN:
+  epochs: 500                  # number of epochs
+  bz: 16                     # batch size
+  lr: 0.001                       # learning rate
+  wd: 0.01                   # weight decay
+  lr_jitter: false             # learning rate scheduler
+
+ConvCA:
+  epochs: 500                  # number of epochs
+  bz: 16                     # batch size
+  lr: 0.0008                       # learning rate
+  wd: 0.0000                  # weight decay
+  lr_jitter: false             # learning rate scheduler
+
+SSVEPformer:
+  epochs: 500                  # number of epochs
+  bz: 16                     # batch size
+  lr: 0.001                       # learning rate
+  wd: 0.0001                   # weight decay
+  lr_jitter: false             # learning rate scheduler
+
+DDGCNN:
+  epochs: 500                  # number of epochs
+  bz: 16                     # batch size
+  lr: 0.001                   # learning rate
+  wd: 0.0001                   # weight decay
+  lr_jitter: true             # learning rate scheduler
+  lr_decay_rate: 0.75         # learning rate decay rate
+  optim_patience: 300        # optimizer patience
+  trans_class: DCD           # {DCD, linear, normal_conv}
+  act: leakyrelu             # activation layer {relu, prelu, leakyrelu}
+  norm: layer                # {batch, layer, instance} normalization
+  n_filters: 128            # 64 or 128
+
+
+
+
+
+

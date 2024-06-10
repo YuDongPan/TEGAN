@@ -1,6 +1,8 @@
 # Designer:Pan YuDong
 # Coder:God's hand
 # Time:2022/1/28 2:18
+import math
+import operator
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -22,11 +24,11 @@ def plot_save_Result(final_acc_list, model_name, dataset='Benchmark', UD=0, rati
     if ratio == -1:
         proportion = 'Training-Free'
     elif ratio == 1:
-        proportion = 'R1'
+        proportion = '8vs2'
     elif ratio == 2:
-        proportion = 'R2'
+        proportion = '5vs5'
     elif ratio == 3:
-        proportion = 'R3'
+        proportion = '2vs8'
     else:
         proportion = 'N-1vs1'
 
@@ -112,15 +114,16 @@ def plot_save_Result(final_acc_list, model_name, dataset='Benchmark', UD=0, rati
 
 def plot_sig(xstart, xend, ystart, yend, sig, color='red'):
     for i in range(len(xstart)):
-        # plot vertical line
-        x = np.ones((2)) * xstart[i]
-        y = np.arange(ystart[i], yend[i], yend[i] - ystart[i] - 0.1)
-        plt.plot(x, y, color="black", linewidth=1)
+        if xstart[i] != xend[i]:
+            # plot vertical line
+            x = np.ones((2)) * xstart[i]
+            y = np.arange(ystart[i], yend[i], yend[i] - ystart[i] - 0.1)
+            plt.plot(x, y, color="black", linewidth=1)
 
-        # plot horizontal line
-        x = np.arange(xstart[i], xend[i] + 0.1, xend[i] - xstart[i])
-        y = yend[i] + 0 * x
-        plt.plot(x, y, color="black", linewidth=1)
+            # plot horizontal line
+            x = np.arange(xstart[i], xend[i] + 0.1, xend[i] - xstart[i])
+            y = yend[i] + 0 * x
+            plt.plot(x, y, color="black", linewidth=1)
 
         # plot annotator
         x0 = (xstart[i] + xend[i]) / 2
@@ -128,7 +131,9 @@ def plot_sig(xstart, xend, ystart, yend, sig, color='red'):
         deleta_x = -15 + (3 - len(sig[i])) * 5
         plt.annotate(r'%s' % sig[i], xy=(x0, y0), xycoords='data', xytext=(deleta_x, -2),
                      textcoords='offset points', fontsize=18, color=color)
-        x = np.ones((2)) * xend[i]
-        y = np.arange(ystart[i], yend[i], yend[i] - ystart[i] - 0.1)
-        plt.plot(x, y, color="black", linewidth=1)
+
+        if xstart[i] != xend[i]:
+            x = np.ones((2)) * xend[i]
+            y = np.arange(ystart[i], yend[i], yend[i] - ystart[i] - 0.1)
+            plt.plot(x, y, color="black", linewidth=1)
         # plt.ylim(0, math.ceil(max(yend) + 4))  # 使用plt.ylim设置y坐标轴范围

@@ -4,17 +4,20 @@
 import scipy
 from scipy import signal
 import numpy as np
+import pandas as pd
 import math
+from etc.global_config import config
+
 class TRCA():
     def __init__(self, opt, train_dataset, test_dataset):
-        self.opt = opt
-        self.Fs = opt.Fs
-        self.T = int(self.Fs * opt.ws * opt.factor)
-        self.Nm = self.opt.Nm
-        self.Nc = self.opt.Nc
-        self.Nf = self.opt.Nf
-        self.dataset = self.opt.dataset
-        self.is_ensemble = self.opt.is_ensemble
+        self.F = config["data_param"]["F"]
+        self.Fs = config["data_param"]["Fs"]
+        self.ws = config["data_param"]["ws"]
+        self.Nf = config["data_param"]["Nf"]
+        self.Nc = config["data_param"]["Nc"]
+        self.T = int(self.Fs * self.ws * self.F)
+        self.Nm = config["TRCA"]["Nm"]
+        self.is_ensemble = config["TRCA"]["is_ensemble"]
 
         self.train_data = train_dataset[0].reshape(self.Nf, -1, self.Nc, self.T)  # (Nh, Nc, T) -> (Nf, Nb, Nc, T)
         self.train_label = train_dataset[1].reshape(self.Nf, -1)  # (Nh, N) -> (Nf, Nb, 1)
@@ -36,15 +39,10 @@ class TRCA():
         result = np.zeros((self.Nf, self.Nm, self.Nc, self.T, eeg.shape[1]))
 
         nyq = self.Fs / 2
-        if self.dataset == 'Direction':
-            passband = [4, 10, 16, 22, 28, 34, 40]
-            stopband = [2, 6, 10, 16, 22, 28, 34]
-            highcut_pass, highcut_stop = 40, 50
-
-        else:
-            passband = [6, 14, 22, 30, 38, 46, 54, 62, 70, 78]
-            stopband = [4, 10, 16, 24, 32, 40, 48, 56, 64, 72]
-            highcut_pass, highcut_stop = 80, 90
+        passband = config["TRCA"]["passband"]
+        stopband = config["TRCA"]["stopband"]
+        highcut_pass = config["TRCA"]["highcut_pass"]
+        highcut_stop = config["TRCA"]["highcut_stop"]
 
         gpass, gstop, Rp = 3, 40, 0.5
         for i in range(self.Nm):
@@ -118,11 +116,14 @@ class TRCA():
                         r[fb_i, class_i, trial_i] = r_tmp[0, 1]
 
             rho = np.einsum('j, jkl -> kl', fb_coefs, r)  # (num_targs, num_trials)
+            # print("rho:", np.mean(rho, axis=1))
             rho_list[targ_i] = np.mean(rho, axis=1)
 
             tau = np.argmax(rho, axis=0)
             results[targ_i, :] = tau
 
+        df = pd.DataFrame(data=rho_list)
+        df.to_csv('../Figure/Corr_Analysis/TRCA_AUG_S5.csv', index=False)
 
         return results
 

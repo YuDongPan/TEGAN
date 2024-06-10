@@ -1,88 +1,156 @@
 # 设计师:Pan YuDong
 # 编写者:God's hand
-# 时间:2022/1/28 0:13
+# 时间:2022/12/1 16:14
+import scipy
+from scipy import signal
 import numpy as np
-from sklearn.cross_decomposition import CCA
-class CCA_Base():
-    def __init__(self, opt):
-        super(CCA_Base, self).__init__()
-        self.Nh = opt.Nh
-        self.Fs = opt.Fs
-        self.Nf = opt.Nf
-        self.ws = opt.ws
-        self.Nc = opt.Nc
-        self.factor = opt.factor
-        self.T = int(self.Fs * self.ws * self.factor)
+import pandas as pd
+import math
+from etc.global_config import config
 
-    def get_Reference_Signal(self, num_harmonics, targets):
-        reference_signals = []
-        t = np.arange(0, (self.T / self.Fs), step=1.0 / self.Fs)
-        for f in targets:
-            reference_f = []
-            for h in range(1, num_harmonics + 1):
-                reference_f.append(np.sin(2 * np.pi * h * f * t)[0:self.T])
-                reference_f.append(np.cos(2 * np.pi * h * f * t)[0:self.T])
-            reference_signals.append(reference_f)
-        reference_signals = np.asarray(reference_signals)
-        return reference_signals
+class TRCA():
+    def __init__(self, train_dataset, test_dataset):
+        self.F = config["TEGAN"]["F"]
+        self.Fs = config["data_param"]["Fs"]
+        self.ws = config["data_param"]["ws"]
+        self.Nf = config["data_param"]["Nf"]
+        self.Nc = config["data_param"]["Nc"]
+        self.T = int(self.Fs * self.ws * self.F)
+        self.Nm = config["TRCA"]["Nm"]
+        self.is_ensemble = config["TRCA"]["is_ensemble"]
 
-    def get_Template_Signal(self, X, targets):
-        reference_signals = []
-        num_per_cls = X.shape[0] // self.Nf
-        for cls_num in range(len(targets)):
-            reference_f = X[cls_num * num_per_cls:(cls_num + 1) * num_per_cls]
-            reference_f = np.mean(reference_f, axis=0)
-            reference_signals.append(reference_f)
-        reference_signals = np.asarray(reference_signals)
-        return reference_signals
+        self.train_data = train_dataset[0].reshape(self.Nf, -1, self.Nc, self.T)  # (Nh, Nc, T) -> (Nf, Nb, Nc, T)
+        self.train_label = train_dataset[1].reshape(self.Nf, -1)  # (Nh, N) -> (Nf, Nb, 1)
+        self.test_data = test_dataset[0].reshape(self.Nf, -1, self.Nc, self.T)
+        self.test_label = test_dataset[1].reshape(self.Nf, -1)
 
-    def find_correlation(self, n_components, X, Y):
-        cca = CCA(n_components)
-        corr = np.zeros(n_components)
-        num_freq = Y.shape[0]
-        result = np.zeros(num_freq)
-        for freq_idx in range(0, num_freq):
-            matched_X = X
+        # for plotting
+        # self.test_data = np.expand_dims(np.mean(self.test_data, axis=1), 1)
+        # self.test_label = np.expand_dims(np.mean(self.test_label, axis=1), 1)
 
-            cca.fit(matched_X.T, Y[freq_idx].T)
-            # cca.fit(X.T, Y[freq_idx].T)
-            x_a, y_b = cca.transform(matched_X.T, Y[freq_idx].T)
-            for i in range(0, n_components):
-                corr[i] = np.corrcoef(x_a[:, i], y_b[:, i])[0, 1]
-                result[freq_idx] = np.max(corr)
+
+    def load_data(self):
+        self.train_data = self.filter_bank(self.train_data)
+        self.test_data = self.filter_bank(self.test_data)
+        # print("train_data.shape:", self.train_data.shape)
+        # print("test_data.shape:", self.test_data.shape)
+
+    def filter_bank(self, eeg):
+        result = np.zeros((self.Nf, self.Nm, self.Nc, self.T, eeg.shape[1]))
+
+        nyq = self.Fs / 2
+        passband = config["TRCA"]["passband"]
+        stopband = config["TRCA"]["stopband"]
+        highcut_pass = config["TRCA"]["highcut_pass"]
+        highcut_stop = config["TRCA"]["highcut_stop"]
+
+        gpass, gstop, Rp = 3, 40, 0.5
+        for i in range(self.Nm):
+            Wp = [passband[i] / nyq, highcut_pass / nyq]
+            Ws = [stopband[i] / nyq, highcut_stop / nyq]
+            [N, Wn] = signal.cheb1ord(Wp, Ws, gpass, gstop)
+            [B, A] = signal.cheby1(N, Rp, Wn, 'bandpass')
+            data = signal.filtfilt(B, A, eeg, padlen=3 * (max(len(B), len(A)) - 1)).copy()
+            result[:, i, :, :, :] = np.transpose(data, (0, 2, 3, 1))
 
         return result
 
-    def cca_classify(self, targets, test_data, num_harmonics=3, train_data=None, template=False):
-        if template:
-            reference_signals = self.get_Template_Signal(train_data, targets)
+    def train_trca(self, eeg):
+        [num_targs, _, num_chans, num_smpls, _] = eeg.shape
+        trains = np.zeros((num_targs, self.Nm, num_chans, num_smpls))
+        W = np.zeros((self.Nm, num_targs, num_chans))
+        for targ_i in range(num_targs):
+            eeg_tmp = eeg[targ_i, :, :, :, :]
+            for fb_i in range(self.Nm):
+                traindata = eeg_tmp[fb_i, :, :, :]
+                trains[targ_i, fb_i, :, :] = np.mean(traindata, 2)
+                w_tmp = self.trca(traindata)
+                W[fb_i, targ_i, :] = np.real(w_tmp[:, 0])
+
+        return trains, W
+
+    def trca(self, eeg):
+        [num_chans, num_smpls, num_trials] = eeg.shape
+        S = np.zeros((num_chans, num_chans))
+        for trial_i in range(num_trials - 1):
+            x1 = eeg[:, :, trial_i]
+            x1 = x1 - np.expand_dims(np.mean(x1, 1), 1).repeat(x1.shape[1], 1)
+            for trial_j in range(trial_i + 1, num_trials):
+                x2 = eeg[:, :, trial_j]
+                x2 = x2 - np.expand_dims(np.mean(x2, 1), 1).repeat(x2.shape[1], 1)
+                S = S + np.matmul(x1, x2.T) + np.matmul(x2, x1.T)
+
+        UX = eeg.reshape(num_chans, num_smpls * num_trials)
+        UX = UX - np.expand_dims(np.mean(UX, 1), 1).repeat(UX.shape[1], 1)
+        Q = np.matmul(UX, UX.T)
+        W, V = scipy.sparse.linalg.eigs(S, 6, Q)
+        return V
+
+    def test_trca(self, eeg, trains, W, is_ensemble):
+        num_trials = eeg.shape[4]
+        if self.Nm == 1:
+            fb_coefs = [i for i in range(1, self.Nm + 1)]
         else:
-            reference_signals = self.get_Reference_Signal(num_harmonics, targets)
+            fb_coefs = [math.pow(i, -1.25) + 0.25 for i in range(1, self.Nm + 1)]
+        fb_coefs = np.array(fb_coefs)
+        results = np.zeros((self.Nf, num_trials))
 
-        print("segmented_data.shape:", test_data.shape)
-        print("reference_signals.shape:", reference_signals.shape)
+        for targ_i in range(self.Nf):
+            test_tmp = eeg[targ_i, :, :, :, :]
+            r = np.zeros((self.Nm, self.Nf, num_trials))
 
-        predicted_class = []
-        labels = []
-        num_segments = test_data.shape[0]
-        num_perCls = num_segments // reference_signals.shape[0]
+            for fb_i in range(self.Nm):
+                testdata = test_tmp[fb_i, :, :, :]
 
-        rho_list = np.zeros((self.Nf, self.Nf))
-        result_list = np.zeros((self.Nf, ))
+                for class_i in range(self.Nf):
+                    traindata = trains[class_i, fb_i, :, :]
+                    if not is_ensemble:
+                        w = W[fb_i, class_i, :]
+                    else:
+                        w = W[fb_i, :, :].T
+                    for trial_i in range(num_trials):
+                        testdata_w = np.matmul(testdata[:, :, trial_i].T, w)
+                        traindata_w = np.matmul(traindata[:, :].T, w)
+                        r_tmp = np.corrcoef(testdata_w.flatten(), traindata_w.flatten())
+                        r[fb_i, class_i, trial_i] = r_tmp[0, 1]
 
-        for segment in range(0, num_segments):
-            labels.append(segment // num_perCls)
-            result = self.find_correlation(1, test_data[segment], reference_signals)
-            if (segment + 1) % num_perCls == 0:
-                rho_list[(segment + 1) // num_perCls - 1] = result_list / num_perCls
-                result_list[:] = 0
+            rho = np.einsum('j, jkl -> kl', fb_coefs, r)  # (num_targs, num_trials)
 
-            result_list += result
-            predicted_class.append(np.argmax(result) + 1)
+            tau = np.argmax(rho, axis=0)
+            results[targ_i, :] = tau
 
-        # df = pd.DataFrame(data=rho_list)
-        # df.to_csv('../Figure/Corr_Analysis/ITCCA_AUG_S5.csv', index=False)
 
-        labels = np.array(labels) + 1
-        predicted_class = np.array(predicted_class)
-        return labels, predicted_class
+        return results
+
+    def cal_itr(self, n, p, t):
+        if p < 0 or 1 < p:
+            print('Accuracy need to be between 0 and 1.')
+            exit()
+        elif p < 1 / n:
+            print('The ITR might be incorrect because the accuracy < chance level.')
+            itr = 0
+        elif p == 1:
+            itr = math.log2(n) * 60 / t
+        else:
+            itr = (math.log2(n) + p * math.log2(p) + (1 - p) * math.log2((1 - p) / (n - 1))) * 60 / t
+        return itr
+
+    def fit(self):
+        # Training stage
+        # print(traindata.shape)
+        trains, W = self.train_trca(self.train_data)
+
+        # Test stage
+        # print(testdata.shape)
+        estimated = self.test_trca(self.test_data, trains, W, self.is_ensemble)
+
+        # Evaluation
+        is_correct = (estimated == self.test_label)
+        is_correct = np.array(is_correct).astype(int)
+
+        test_acc = np.mean(is_correct)
+
+        return test_acc
+
+
+

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch import nn
 from torch.autograd import Variable
-from Utils import Tools, LossFunction, Scripts
+from Utils import Tools, LossFunction, Script
 
 def train_on_batch(opt, epochs, train_iter, G, D, device, subject=1, source=0, fold_num=0, lr_jitter=False):
     # cross entropy loss and optimizer
@@ -16,13 +16,15 @@ def train_on_batch(opt, epochs, train_iter, G, D, device, subject=1, source=0, f
     ce_loss1 = ce_loss1.to(device)
     ce_loss2 = nn.CrossEntropyLoss()
     ce_loss2 = ce_loss2.to(device)
-    d_optimizer = torch.optim.Adam(D.parameters(), lr=opt.lr, betas=(0.9, 0.999), weight_decay=opt.wd)
-    g_optimizer = torch.optim.Adam(G.parameters(), lr=opt.lr, betas=(0.9, 0.999), weight_decay=opt.wd)
-    d_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optimizer, T_max=epochs * len(train_iter), eta_min=5e-6)
-    g_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(g_optimizer, T_max=epochs * len(train_iter), eta_min=5e-6)
-    lecam_ema = LossFunction.LeCamEMA(decay=0.99, start_iter=opt.start)
+    d_optimizer = torch.optim.Adam(D.parameters(), lr=opt["lr"], betas=(0.9, 0.999), weight_decay=opt["wd"])
+    g_optimizer = torch.optim.Adam(G.parameters(), lr=opt["lr"], betas=(0.9, 0.999), weight_decay=opt["wd"])
+    d_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(d_optimizer, T_max=opt["epochs"] * len(train_iter),
+                                                             eta_min=5e-6)
+    g_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(g_optimizer, T_max=opt["epochs"] * len(train_iter),
+                                                             eta_min=5e-6)
+    lecam_ema = LossFunction.LeCamEMA(decay=0.99, start_iter=opt["start"])
 
-    Tools.CLE_DIR_CONENT(f'../Generation/TEGAN/{opt.dataset}')
+    Tools.CLE_DIR_CONENT(f'../Generation/TEGAN/{opt["Ds"]}')
 
     epoch_list = []
     # evaluation metrics
@@ -52,7 +54,7 @@ def train_on_batch(opt, epochs, train_iter, G, D, device, subject=1, source=0, f
             aux_loss_real = ce_loss1(real_aux, labels)
 
             # compute loss of fake_eeg
-            z = real_eeg[:, :, :, :round(opt.ws * opt.Fs)]
+            z = real_eeg[:, :, :, :round(opt["ws"] * opt["Fs"])]
             fake_eeg, fake_label = G(z)
             fake_prob, fake_aux = D(fake_eeg.detach())
             aux_loss_fake = ce_loss1(fake_aux, labels)
@@ -113,11 +115,11 @@ def train_on_batch(opt, epochs, train_iter, G, D, device, subject=1, source=0, f
                 plt_eeg = real_eegs[stochastic_index]
                 labels = labels.cpu().data
                 plt_label = labels[stochastic_index]
-                plt_eeg = plt_eeg.reshape(opt.Nc, round(opt.factor * opt.Fs * opt.ws))
+                plt_eeg = plt_eeg.reshape(opt["Nc"], round(opt["F"] * opt["Fs"] * opt["ws"]))
                 plt_label.squeeze(-1)
-                Tools.plot_TimeEEG(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt.dataset,
+                Tools.plot_TimeEEG(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt["Ds"],
                                    real_or_fake='real')
-                Tools.plot_TimeFreqEEG2CH(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt.dataset,
+                Tools.plot_TimeFreqEEG2CH(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt["Ds"],
                                           real_or_fake='real')
 
                 # after each iteration,plot fake EEG
@@ -125,11 +127,11 @@ def train_on_batch(opt, epochs, train_iter, G, D, device, subject=1, source=0, f
                 plt_eeg = fake_eegs[stochastic_index]
                 labels = labels.cpu().data
                 plt_label = labels[stochastic_index]
-                plt_eeg = plt_eeg.reshape(opt.Nc, round(opt.factor * opt.Fs * opt.ws))
+                plt_eeg = plt_eeg.reshape(opt["Nc"], round(opt["F"] * opt["Fs"] * opt["ws"]))
                 plt_label.squeeze(-1)
-                Tools.plot_TimeEEG(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt.dataset,
+                Tools.plot_TimeEEG(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt["Ds"],
                                    real_or_fake='fake')
-                Tools.plot_TimeFreqEEG2CH(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt.dataset,
+                Tools.plot_TimeFreqEEG2CH(subject, plt_eeg, plt_label, epoch, model_name="TEGAN", dataset=opt["Ds"],
                                           real_or_fake='fake')
 
         epoch_list.append(epoch + 1)
@@ -140,19 +142,19 @@ def train_on_batch(opt, epochs, train_iter, G, D, device, subject=1, source=0, f
         d_acc_list.append(sum_d_acc / len_iter)
 
         # print the evaluation metrics for training process
-        print(f'epoch{epoch + 1} d_loss={sum_d_loss / len_iter:.3f}, g_loss={sum_g_loss / len_iter:.3f}, '
+        print(f'epoch{epoch + 1}: d_loss={sum_d_loss / len_iter:.3f}, g_loss={sum_g_loss / len_iter:.3f}, '
               f'real_acc:{sum_real_acc / len_iter:.3f}, fake_acc:{sum_fake_acc / len_iter:.3f}, '
               f'cls_acc:{sum_d_acc / len_iter:.3f}')
 
     if source == 0:
-        torch.save(G.state_dict(), f'../Pretrain/{opt.dataset}/{opt.ws}S-{opt.ws*opt.factor}S/'
-                                   f'Source/TEGAN_LC_Gs_S{subject}.pth')
-        torch.save(D.state_dict(), f'../Pretrain/{opt.dataset}/{opt.ws}S-{opt.ws*opt.factor}S/'
-                                   f'Source/TEGAN_LC_Ds_S{subject}.pth')
+        torch.save(G.state_dict(),
+                   f'../Pretrain/{opt["Ds"]}/{opt["ws"]}S-{opt["ws"] * opt["F"]}S/TEGAN_LC_Gs_S{subject}.pth')
+        torch.save(D.state_dict(),
+                   f'../Pretrain/{opt["Ds"]}/{opt["ws"]}S-{opt["ws"] * opt["F"]}S/TEGAN_LC_Ds_S{subject}.pth')
 
     else:
-        torch.save(G.state_dict(), f'../Pretrain/{opt.dataset}/{opt.ws}S-{opt.ws*opt.factor}S/'
-                                   f'Target/R{opt.ratio}/F{fold_num}/TEGAN_LC_Gt_S{subject}.pth')
+        torch.save(G.state_dict(), f'../Pretrain/{opt["Ds"]}/{opt["ws"]}S-{opt["ws"] * opt["F"]}S/'
+                                   f'TEGAN_LC_Gt_S{subject}_R{opt["ratio"]}F{fold_num}.pth')
 
 
     plt.plot(epoch_list, d_loss_list)
@@ -163,5 +165,5 @@ def train_on_batch(opt, epochs, train_iter, G, D, device, subject=1, source=0, f
     plt.xlabel('epoch')
     plt.title('Training process for TEGAN')
     plt.legend(['d_loss', 'g_loss', 'real_acc', 'fake_acc', 'd_acc'], loc='upper right')
-    plt.savefig(f'../Figure/Loss_Curve/{opt.dataset}/TEGAN_S{subject}.png')
+    plt.savefig(f'../Figure/Loss_Curve/{opt["Ds"]}/TEGAN_S{subject}.png')
     plt.show()

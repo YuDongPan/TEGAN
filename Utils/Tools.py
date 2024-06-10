@@ -8,10 +8,10 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import Utils.Normalization as Norm
-from Model import TEGAN as TEGAN
+from Model import TEGAN_V20 as TEGAN
 from matplotlib.collections import LineCollection
 from scipy import signal
-from Utils import Scripts
+from Utils import Script
 
 def norm_single_eeg(eeg_data, method=1):
     '''
@@ -87,7 +87,7 @@ def plot_TimeEEG(subject, eeg_data, eeg_label, epoch, model_name, dataset, real_
     # for 4-class dataset
     if dataset == 'Direction':
         ax.set_yticklabels(['P7', 'P3', 'Pz', 'P4', 'P8', 'PO9', 'O1', 'OZ', 'O2', 'PO10'])
-    # for 12-class dataset
+    # for 40-class dataset
     else:
         ax.set_yticklabels(['PO7', 'PO3', 'POZ', 'PO4', 'PO8', 'O1', 'OZ', 'O2'])
 
@@ -174,6 +174,9 @@ def plot_EEG_CMP(opt, subject, class_num, source_eeg, target_eeg, source=True):
     real_eeg = norm_single_eeg(real_eeg[0, 0], method=1)[-2]  # -2 means Oz channel
     fake_eeg = norm_single_eeg(fake_eeg[0, 0], method=1)[-2]
 
+    rho_time = np.corrcoef(real_eeg, fake_eeg)[0][1]
+    print("rho_time:", rho_time)
+
     # construct time sequence
     t = np.arange(0, round(opt.factor * opt.ws), 1.0 / opt.Fs)
 
@@ -189,6 +192,10 @@ def plot_EEG_CMP(opt, subject, class_num, source_eeg, target_eeg, source=True):
     frq = frq[range(int(max_freq // 2))]
     R_Y = np.fft.fft(real_eeg)
     F_Y = np.fft.fft(fake_eeg)
+
+    rho_freq = np.corrcoef(np.abs(R_Y), np.abs(F_Y))[0][1]
+    print("rho_freq:", rho_freq)
+
     R_Y = R_Y[range(int(max_freq // 2))] / max_freq * 4
     F_Y = F_Y[range(int(max_freq // 2))] / max_freq * 4
 
@@ -196,8 +203,8 @@ def plot_EEG_CMP(opt, subject, class_num, source_eeg, target_eeg, source=True):
     matplotlib.rcParams['ytick.direction'] = 'in'
 
     fig, ax = plt.subplots(2, 1, figsize=(14, 8), dpi=160)
-    font1 = {'family': 'Times New Roman', 'weight': 'normal', 'size': 18}
-    font2 = {'family': 'Times New Roman', 'weight': 'normal', 'size': 15}
+    font1 = {'family': 'Times New Roman', 'weight': 'normal', 'size': 22}
+    font2 = {'family': 'Times New Roman', 'weight': 'normal', 'size': 16}
 
     # Always place grid at bottom
     ax[0].grid(True)
@@ -208,15 +215,15 @@ def plot_EEG_CMP(opt, subject, class_num, source_eeg, target_eeg, source=True):
     ax[0].set_ylim(-1.24, 1.24, 0.25)
     ax[0].bar(1, 0, label='Real_EEG', color='blue')
     ax[0].bar(1, 0, label='Gen_EEG', color='orange')
-    ax[0].legend(prop=font2, loc='upper right', framealpha=1.0)
+    ax[0].legend(prop=font2, loc='upper right', framealpha=0.8)
 
     for size in ax[0].get_xticklabels():  # 获取x轴上所有坐标，并设置字号
         size.set_fontname('Times New Roman')
-        size.set_fontsize('15')
+        size.set_fontsize('20')
 
     for size in ax[0].get_yticklabels():  # 获取y轴上所有坐标，并设置字号
         size.set_fontname('Times New Roman')
-        size.set_fontsize('15')
+        size.set_fontsize('20')
 
     R_energy_spectrum = np.sqrt(np.square(R_Y.real) + np.square(R_Y.imag))
     max_index = np.argmax(R_energy_spectrum)
@@ -228,17 +235,22 @@ def plot_EEG_CMP(opt, subject, class_num, source_eeg, target_eeg, source=True):
     ax[1].bar(1, 0, label='Gen_EEG', color='green')
     ax[1].set_xlabel('Freq (Hz)', fontdict=font1)
     ax[1].set_ylabel('Amplitude (μV)', fontdict=font1)
-    ax[1].legend(prop=font2, loc='upper right', framealpha=1.0)
+    ax[1].legend(prop=font2, loc='upper right', framealpha=0.8)
 
     marker_freq = targets[class_num]
+    # circle_x_lst = [6.5, 13.5, 20.0, 27.0, 33.5]
+    circle_x_lst = [12.0, 24.0, 36.0]
+    k = 0
     while marker_freq <= 40:
-       circle_x = int(marker_freq) + 0.5 if marker_freq + 0.5 > int(marker_freq) + 1 else int(marker_freq)
+       circle_x = circle_x_lst[k]
+       # circle_x = int(marker_freq) + 0.5 if marker_freq + 0.5 >= int(marker_freq) + 1 else int(marker_freq)
        y1 = abs(R_Y)[int(circle_x * int(1 / FR))]
        y2 = abs(F_Y)[int(circle_x * int(1 / FR))]
        circle_y = y1 if y1 > y2 else y2
        ax[1].scatter(x=circle_x, y=circle_y, facecolors='none', marker='o', edgecolors='r',
                      s=200)  # set the color to null and control the color through edgecolors
        marker_freq += targets[class_num]
+       k += 1
 
     # ax[1].text(max_index * FR, R_energy_spectrum[max_index], str(max_index * FR) + 'Hz', color='r')
     ax[1].set_ylim(0, R_energy_spectrum[max_index] + 0.2)
@@ -246,11 +258,11 @@ def plot_EEG_CMP(opt, subject, class_num, source_eeg, target_eeg, source=True):
     # ax[0].set_title(title)
     for size in ax[1].get_xticklabels():  # Get all coordinates on the x-axis and set font size
         size.set_fontname('Times New Roman')
-        size.set_fontsize('15')
+        size.set_fontsize('20')
 
     for size in ax[1].get_yticklabels():  # Get all coordinates on the y-axis and set font size
         size.set_fontname('Times New Roman')
-        size.set_fontsize('15')
+        size.set_fontsize('20')
 
     plt.tight_layout()
     plt.savefig(f'../Figure/GEN_EEG_CMP/{opt.dataset}_S{subject}_Class{class_num}_CMP.png')

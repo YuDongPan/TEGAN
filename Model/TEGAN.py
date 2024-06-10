@@ -7,7 +7,7 @@
     1.t -> 2t
     2.Improved TEGAN——Version 15
     3.Add SN both in generator and discriminator
-    4.**Remarkable progress in 12-class dataset(1s-2S)**
+    4.**Remarkable progress in 12-class dataset(1S-2S)**
 '''
 import torch
 import math
@@ -120,7 +120,6 @@ class Discriminator(nn.Module):
         self.aux = nn.Sequential(
             DLM.snlinear(self.D, self.Nf),
         )
-
 
 
     def forward(self, x):
@@ -322,11 +321,6 @@ class Generator(nn.Module):
 
         '''Up sample stage'''
         skip_X = X.repeat(1, self.Nc, 1, 1)
-
-        # Data-Label Fusion
-        # up_label = self.X_embed(label).reshape(-1, 1, 1, T)
-        # up_label = up_label.repeat(1, c, 1, 1)
-        # r_out = r_out * up_label
 
         r_out_up = r_out
         # r_out_up = F.avg_pool2d(r_out, kernel_size=(1, 2), stride=(1, 2))
