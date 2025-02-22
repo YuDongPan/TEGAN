@@ -1,18 +1,17 @@
 # Introduction
-This repository provides source code for replication of TEGAN [1]. As illusted in the following figure, TEGAN consists of a generator and a discriminator. The generator takes short - length SSVEP signals as input and tries to output long-length artificial SSVEP signals. The discriminator is used to distinguish between real long-length SSVEP signals and generated ones. During training, they compete in a zero-sum game. Also, a two-stage training strategy and the LeCam-divergence regularization term are introduced to regulate the training process. TEGAN can improve the performance of traditional frequency recognition methods and deep- learning-based methods under limited calibration data. It shortens the calibration time and reduces the performance gap among various frequency recognition methods, which is beneficial for the development of high-performance BCI systems.
+This repository provides source code for replication of TEGAN [1]. As illusted in the following figure, TEGAN consists of a generator and a discriminator. The generator takes short-length SSVEP signals as input and tries to output long-length artificial SSVEP signals. The discriminator is used to distinguish between real long-length SSVEP signals and generated ones. During training, they compete in a zero-sum game. Also, a two-stage training strategy and the LeCam-divergence regularization term are introduced to regulate the training process. TEGAN can improve the performance of traditional frequency recognition methods and deep- learning-based methods under limited calibration data. It shortens the calibration time and reduces the performance gap among various frequency recognition methods, which is beneficial for the development of high-performance BCI systems. 4-class publicly dataset [2] and 12-class publicly dataset [3] were used to evaluate the performance of TEGAN. 
 
 ![image](TEGAN_Flowchart.png)
 
 # File Description
-- `data/Dial`: A 12-class public SSVEP dataset [2].
-- `Model/SSVEPNet.py`: Implementation of CNN-LSTM mixed network with pytorch.
-- `Result/DatasetA`: Recorded classification results.
-- `Train/Classifier_Trainer.py`: Training code for any DL-based classifier model.
-- `Test/SSVEPNet_Test.py`: Evaluating the performance for SSVEPNet.
-- `Utils/EEGDataset.py`: Providing the data for intra- and inter- subject experiments.
-- `Utils/Constraint.py`: Implementation of spectral normalization and spatial convolution kernel constraint. 
-- `Utils/LossFunction.py`: Implementation of visual attention based label smooth techniques.
-- `Utils/Ploter`: Plotting histogram to visualize the classification results.
+- `data/`: 4-class and 12-class public SSVEP dataset [2]-[3].
+- `Model/`: Traditional methods and deep learning models.
+- `Train/`: Training code for any DL-based classifier model.
+- `Test/`: Test demos for validating some fuctions.
+- `Utils/`: Providing the tools for loading/ preprocessing/ analysis the eeg data.
+- `Experiment/`: Three classification scenerios to evaluate the performance of TEGAN.
+- `Result/`: Recorded classification results.
+- `etc/`: Configuration file to customize experimental conditions.
 
 ```
 pip install -r Resource/requirements.txt
@@ -24,6 +23,18 @@ pip install -r Resource/requirements.txt
 
 ```
 pip install -r Resource/requirements.txt
+```
+
+* Modify the parameters in `etc/config.yaml` to meet your requirements.  
+* Run experiments in
+  * `Baseline Classifcation Scenarios (train: 20% 0.5 data, test: 80% 0.5 s data)`, 
+  * `Augmentation Classifcation Scenarios (train: 20% 0.5 data + 20 % 1.0 ext_data, test: 80% 0.5 s data)`
+  * `Extension Classification Scenarios (train: 20 % 1.0 ext_data, test: 80% 1.0 s ext_data))`.  
+
+```
+run SSVEP_Classification.py
+run SSVEP_Augmentation_Classification.py
+run SSVEP_Extension_Classification.py
 ```
 
 
